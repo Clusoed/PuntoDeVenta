@@ -184,7 +184,16 @@ def validar_fila(fila: Dict, fila_num: int, categorias_existentes: Dict) -> Tupl
         errores.append("Precio USD inválido")
     
     # Código (opcional, se genera si está vacío)
-    codigo = str(fila.get("Código", "")).strip()
+    codigo_raw = fila.get("Código", "")
+    # Manejar None y strings vacíos correctamente
+    if codigo_raw is None:
+        codigo = ""
+    else:
+        codigo = str(codigo_raw).strip()
+        # Verificar si es literalmente "None" como string
+        if codigo.lower() == "none":
+            codigo = ""
+    
     if codigo:
         datos["codigo"] = codigo
     else:

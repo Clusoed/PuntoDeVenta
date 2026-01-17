@@ -33,13 +33,21 @@ def get_base_path() -> Path:
 
 
 def get_current_version() -> str:
-    """Obtiene la versión actual desde config.json."""
-    config_path = get_base_path() / "config.json"
+    """Obtiene la versión actual desde config.json empaquetado."""
     try:
+        # En PyInstaller, los archivos empaquetados se extraen a sys._MEIPASS
+        if getattr(sys, 'frozen', False):
+            # Ejecutando como .exe - buscar en el directorio temporal de PyInstaller
+            config_path = Path(sys._MEIPASS) / "config.json"
+        else:
+            # Ejecutando como script
+            config_path = Path(__file__).parent.parent.parent / "config.json"
+        
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
             return config.get("version", "0.0.0")
-    except Exception:
+    except Exception as e:
+        print(f"Error leyendo versión: {e}")
         return "0.0.0"
 
 

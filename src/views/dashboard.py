@@ -91,10 +91,11 @@ class DashboardView(ctk.CTkFrame):
         ).pack(side="bottom", pady=10)
     
     def _get_app_version(self) -> str:
-        """Obtiene la versión de la app desde config.json."""
+        """Obtiene la versión de la app desde config.json empaquetado."""
         try:
+            # En PyInstaller, los archivos se extraen a sys._MEIPASS
             if getattr(sys, 'frozen', False):
-                config_path = Path(sys.executable).parent / "config.json"
+                config_path = Path(sys._MEIPASS) / "config.json"
             else:
                 config_path = Path(__file__).parent.parent.parent / "config.json"
             

@@ -169,6 +169,9 @@ def apply_update(update_file: Path):
         # 5. Elimina el backup
         # 6. Ejecuta el nuevo
         batch_content = f'''@echo off
+title ACTUALIZADOR - Punto de Venta
+color 0A
+echo.
 echo ============================================
 echo    ACTUALIZANDO PUNTO DE VENTA
 echo ============================================
@@ -206,21 +209,34 @@ REM Verificar resultado
 if exist "{current_exe}" (
     REM Eliminar backup
     if exist "{backup_exe}" del /f /q "{backup_exe}"
+    cls
+    color 0A
     echo.
-    echo ============================================
-    echo    ACTUALIZACION COMPLETADA EXITOSAMENTE!
-    echo ============================================
     echo.
-    echo Por favor, abra la aplicacion manualmente.
+    echo     ================================================
     echo.
-    echo Presione cualquier tecla para cerrar...
+    echo        ACTUALIZACION COMPLETADA EXITOSAMENTE!
+    echo.
+    echo     ================================================
+    echo.
+    echo.
+    echo     La aplicacion se ha actualizado correctamente.
+    echo.
+    echo     Ya puede abrir Punto de Venta nuevamente.
+    echo.
+    echo.
+    echo     Presione cualquier tecla para cerrar esta ventana...
+    echo.
     pause > nul
 ) else (
+    color 0C
     echo.
     echo ERROR: No se pudo copiar el nuevo ejecutable.
     echo Restaurando version anterior...
     if exist "{backup_exe}" ren "{backup_exe}" "{current_exe_path.name}"
-    pause
+    echo.
+    echo Presione cualquier tecla para cerrar...
+    pause > nul
 )
 
 REM Eliminar este script

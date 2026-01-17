@@ -1,0 +1,11 @@
+{
+    "nombre_tienda": "Mi Tienda",
+    "rif": "",
+    "direccion": "",
+    "telefono": "",
+    "tasa_cambio": 45.50,
+    "iva_porcentaje": 16.0,
+    "tema": "dark",
+    "version": "1.0.0",
+    "github_repo": "Clusoed/PuntoDeVenta"
+}

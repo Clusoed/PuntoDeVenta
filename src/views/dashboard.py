@@ -5,6 +5,8 @@ import customtkinter as ctk
 from datetime import datetime
 import sys
 import os
+import json
+from pathlib import Path
 
 # Agregar el directorio src al path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -78,12 +80,29 @@ class DashboardView(ctk.CTkFrame):
         self.frame_footer.grid(row=3, column=0, columnspan=3, padx=15, pady=(20, 10), sticky="sew")
         self.grid_rowconfigure(3, weight=1)
         
+        # Obtener versión de la app
+        version = self._get_app_version()
+        
         ctk.CTkLabel(
             self.frame_footer,
-            text="Desarrollado por Gutidev  |  📞 +58 412-7416894  | 📱 @gutidev_st",
+            text=f"v{version}  |  Desarrollado por Gutidev  |  📞 +58 412-7416894  | 📱 @gutidev_st",
             font=ctk.CTkFont(size=11),
             text_color=TEXT_MUTED
         ).pack(side="bottom", pady=10)
+    
+    def _get_app_version(self) -> str:
+        """Obtiene la versión de la app desde config.json."""
+        try:
+            if getattr(sys, 'frozen', False):
+                config_path = Path(sys.executable).parent / "config.json"
+            else:
+                config_path = Path(__file__).parent.parent.parent / "config.json"
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get("version", "?.?.?")
+        except Exception:
+            return "?.?.?"
     
     def setup_tasa_frame(self):
         """Configura el frame de la tasa de cambio."""

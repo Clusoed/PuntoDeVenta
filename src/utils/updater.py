@@ -161,36 +161,54 @@ def apply_update(update_file: Path):
         # 5. Elimina el backup
         # 6. Ejecuta el nuevo
         batch_content = f'''@echo off
-echo Aplicando actualizacion...
-echo Por favor espere...
+echo ============================================
+echo    ACTUALIZANDO PUNTO DE VENTA
+echo ============================================
+echo.
+echo Por favor espere, no cierre esta ventana...
+echo.
 
 REM Esperar a que el proceso termine completamente
+echo [1/6] Esperando cierre de la aplicacion...
 timeout /t 3 /nobreak > nul
 
 REM Intentar matar el proceso si aún existe
+echo [2/6] Finalizando procesos...
 taskkill /F /IM "{current_exe_path.name}" 2>nul
 
 REM Esperar un poco más
 timeout /t 2 /nobreak > nul
 
+REM Limpiar carpetas temporales _MEI de PyInstaller (causa del error DLL)
+echo [3/6] Limpiando archivos temporales...
+for /d %%i in ("%TEMP%\\_MEI*") do rd /s /q "%%i" 2>nul
+
 REM Eliminar backup anterior si existe
 if exist "{backup_exe}" del /f /q "{backup_exe}"
 
 REM Renombrar el exe actual como backup
+echo [4/6] Creando backup del ejecutable actual...
 if exist "{current_exe}" ren "{current_exe}" "{current_exe_path.name}.old"
 
 REM Copiar el nuevo exe
+echo [5/6] Instalando nueva version...
 copy /y "{update_file}" "{current_exe}"
 
-REM Si la copia fue exitosa, eliminar backup
+REM Verificar y ejecutar
 if exist "{current_exe}" (
+    REM Eliminar backup
     if exist "{backup_exe}" del /f /q "{backup_exe}"
-    echo Actualizacion completada!
-    timeout /t 1 /nobreak > nul
+    echo.
+    echo [6/6] Actualizacion completada exitosamente!
+    echo.
+    timeout /t 2 /nobreak > nul
     start "" "{current_exe}"
 ) else (
-    echo Error en la actualizacion. Restaurando...
+    echo.
+    echo ERROR: No se pudo copiar el nuevo ejecutable.
+    echo Restaurando version anterior...
     if exist "{backup_exe}" ren "{backup_exe}" "{current_exe_path.name}"
+    pause
 )
 
 REM Eliminar este script

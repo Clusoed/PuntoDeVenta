@@ -1,15 +1,26 @@
 """
 Vista de Reportes del Sistema - Diseño Minimalista
+Con funcionalidad de Exportación a Excel
 """
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 from datetime import datetime, timedelta
 import sys
 import os
+from tkinter import filedialog
+from pathlib import Path
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from database import get_connection, get_tasa_actual
+from database import get_connection, get_tasa_actual, get_productos
 from utils.currency import formato_usd, formato_bs
 from utils.theme import BG_PRINCIPAL, BG_SECUNDARIO, BORDER_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_PRIMARY, BG_HOVER, ACCENT_HOVER
 
@@ -38,6 +49,37 @@ class ReportesView(ctk.CTkFrame):
             text="📈 REPORTES DEL SISTEMA",
             font=ctk.CTkFont(size=24, weight="bold")
         ).pack(side="left")
+        
+        # Botones de exportación
+        frame_export = ctk.CTkFrame(frame_header, fg_color="transparent")
+        frame_export.pack(side="right")
+        
+        ctk.CTkButton(
+            frame_export,
+            text="📥 Exportar Ventas",
+            fg_color="#28a745",
+            hover_color="#218838",
+            width=130,
+            command=self.exportar_ventas
+        ).pack(side="left", padx=3)
+        
+        ctk.CTkButton(
+            frame_export,
+            text="📥 Exportar Compras",
+            fg_color="#17a2b8",
+            hover_color="#138496",
+            width=130,
+            command=self.exportar_compras
+        ).pack(side="left", padx=3)
+        
+        ctk.CTkButton(
+            frame_export,
+            text="📥 Exportar Inventario",
+            fg_color="#6c757d",
+            hover_color="#545b62",
+            width=140,
+            command=self.exportar_inventario
+        ).pack(side="left", padx=3)
         
         # === CONTENIDO ===
         frame_contenido = ctk.CTkFrame(self, fg_color=BG_SECUNDARIO, border_color=BORDER_COLOR, border_width=1)
@@ -347,3 +389,265 @@ class ReportesView(ctk.CTkFrame):
                 text_color=color_estado,
                 padx=8, pady=4
             ).grid(row=idx, column=6, sticky="ew", padx=1)
+    
+    # ==================== FUNCIONES DE EXPORTACIÓN ====================
+    
+    def _crear_estilo_excel(self):
+        """Crea estilos reutilizables para Excel."""
+        return {
+            'header_font': Font(bold=True, color="FFFFFF", size=11),
+            'header_fill': PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid"),
+            'header_alignment': Alignment(horizontal="center", vertical="center", wrap_text=True),
+            'border': Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        }
+    
+    def exportar_ventas(self):
+        """Exporta todas las ventas a Excel."""
+        if not OPENPYXL_AVAILABLE:
+            CTkMessagebox(
+                title="Error",
+                message="La librería openpyxl no está instalada.\nInstálela con: pip install openpyxl",
+                icon="cancel"
+            )
+            return
+        
+        # Obtener datos
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT 
+                v.numero_factura,
+                v.fecha,
+                v.total_usd,
+                v.total_bs,
+                v.forma_pago,
+                v.tasa_cambio,
+                COALESCE(v.estado, 'Completada') as estado,
+                v.observaciones
+            FROM ventas v
+            ORDER BY v.fecha DESC
+        ''')
+        ventas = cursor.fetchall()
+        conn.close()
+        
+        if not ventas:
+            CTkMessagebox(title="Aviso", message="No hay ventas para exportar.", icon="info")
+            return
+        
+        # Seleccionar ubicación
+        fecha_hoy = datetime.now().strftime("%Y%m%d")
+        ruta = filedialog.asksaveasfilename(
+            title="Guardar Ventas",
+            defaultextension=".xlsx",
+            initialfile=f"Ventas_{fecha_hoy}.xlsx",
+            filetypes=[("Archivo Excel", "*.xlsx")]
+        )
+        
+        if not ruta:
+            return
+        
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Ventas"
+            estilos = self._crear_estilo_excel()
+            
+            # Headers
+            headers = ["# Factura", "Fecha", "Total USD", "Total Bs", "Forma Pago", "Tasa", "Estado", "Observaciones"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = estilos['header_font']
+                cell.fill = estilos['header_fill']
+                cell.alignment = estilos['header_alignment']
+                cell.border = estilos['border']
+            
+            # Datos
+            for row, venta in enumerate(ventas, 2):
+                ws.cell(row=row, column=1, value=venta['numero_factura'])
+                ws.cell(row=row, column=2, value=venta['fecha'])
+                ws.cell(row=row, column=3, value=venta['total_usd'])
+                ws.cell(row=row, column=4, value=venta['total_bs'])
+                ws.cell(row=row, column=5, value=venta['forma_pago'])
+                ws.cell(row=row, column=6, value=venta['tasa_cambio'])
+                ws.cell(row=row, column=7, value=venta['estado'])
+                ws.cell(row=row, column=8, value=venta['observaciones'] or "")
+            
+            # Ajustar anchos
+            for col in range(1, 9):
+                ws.column_dimensions[get_column_letter(col)].width = 15
+            
+            wb.save(ruta)
+            CTkMessagebox(
+                title="Exportación Exitosa",
+                message=f"Se exportaron {len(ventas)} ventas.\n\nArchivo: {Path(ruta).name}",
+                icon="check"
+            )
+        except Exception as e:
+            CTkMessagebox(title="Error", message=f"Error al exportar:\n{str(e)}", icon="cancel")
+    
+    def exportar_compras(self):
+        """Exporta todas las compras a Excel."""
+        if not OPENPYXL_AVAILABLE:
+            CTkMessagebox(
+                title="Error",
+                message="La librería openpyxl no está instalada.\nInstálela con: pip install openpyxl",
+                icon="cancel"
+            )
+            return
+        
+        # Obtener datos
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT 
+                c.numero_factura,
+                c.fecha,
+                p.nombre as proveedor,
+                c.total_usd,
+                c.total_bs,
+                c.forma_pago,
+                c.tasa_cambio,
+                COALESCE(c.estado, 'Completada') as estado,
+                c.observaciones
+            FROM compras c
+            LEFT JOIN proveedores p ON c.proveedor_id = p.id
+            ORDER BY c.fecha DESC
+        ''')
+        compras = cursor.fetchall()
+        conn.close()
+        
+        if not compras:
+            CTkMessagebox(title="Aviso", message="No hay compras para exportar.", icon="info")
+            return
+        
+        # Seleccionar ubicación
+        fecha_hoy = datetime.now().strftime("%Y%m%d")
+        ruta = filedialog.asksaveasfilename(
+            title="Guardar Compras",
+            defaultextension=".xlsx",
+            initialfile=f"Compras_{fecha_hoy}.xlsx",
+            filetypes=[("Archivo Excel", "*.xlsx")]
+        )
+        
+        if not ruta:
+            return
+        
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Compras"
+            estilos = self._crear_estilo_excel()
+            estilos['header_fill'] = PatternFill(start_color="17a2b8", end_color="17a2b8", fill_type="solid")
+            
+            # Headers
+            headers = ["# Factura", "Fecha", "Proveedor", "Total USD", "Total Bs", "Forma Pago", "Tasa", "Estado", "Observaciones"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = estilos['header_font']
+                cell.fill = estilos['header_fill']
+                cell.alignment = estilos['header_alignment']
+                cell.border = estilos['border']
+            
+            # Datos
+            for row, compra in enumerate(compras, 2):
+                ws.cell(row=row, column=1, value=compra['numero_factura'])
+                ws.cell(row=row, column=2, value=compra['fecha'])
+                ws.cell(row=row, column=3, value=compra['proveedor'] or "Sin proveedor")
+                ws.cell(row=row, column=4, value=compra['total_usd'])
+                ws.cell(row=row, column=5, value=compra['total_bs'])
+                ws.cell(row=row, column=6, value=compra['forma_pago'])
+                ws.cell(row=row, column=7, value=compra['tasa_cambio'])
+                ws.cell(row=row, column=8, value=compra['estado'])
+                ws.cell(row=row, column=9, value=compra['observaciones'] or "")
+            
+            # Ajustar anchos
+            for col in range(1, 10):
+                ws.column_dimensions[get_column_letter(col)].width = 15
+            
+            wb.save(ruta)
+            CTkMessagebox(
+                title="Exportación Exitosa",
+                message=f"Se exportaron {len(compras)} compras.\n\nArchivo: {Path(ruta).name}",
+                icon="check"
+            )
+        except Exception as e:
+            CTkMessagebox(title="Error", message=f"Error al exportar:\n{str(e)}", icon="cancel")
+    
+    def exportar_inventario(self):
+        """Exporta el inventario actual a Excel."""
+        if not OPENPYXL_AVAILABLE:
+            CTkMessagebox(
+                title="Error",
+                message="La librería openpyxl no está instalada.\nInstálela con: pip install openpyxl",
+                icon="cancel"
+            )
+            return
+        
+        # Obtener datos
+        productos = get_productos()
+        
+        if not productos:
+            CTkMessagebox(title="Aviso", message="No hay productos en inventario.", icon="info")
+            return
+        
+        # Seleccionar ubicación
+        fecha_hoy = datetime.now().strftime("%Y%m%d")
+        ruta = filedialog.asksaveasfilename(
+            title="Guardar Inventario",
+            defaultextension=".xlsx",
+            initialfile=f"Inventario_{fecha_hoy}.xlsx",
+            filetypes=[("Archivo Excel", "*.xlsx")]
+        )
+        
+        if not ruta:
+            return
+        
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Inventario"
+            estilos = self._crear_estilo_excel()
+            estilos['header_fill'] = PatternFill(start_color="6c757d", end_color="6c757d", fill_type="solid")
+            
+            # Headers
+            headers = ["Código", "Nombre", "Categoría", "Marca", "Unidad", "Precio USD", "Costo USD", 
+                      "% Ganancia", "Stock Actual", "Stock Mínimo", "Estado"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = estilos['header_font']
+                cell.fill = estilos['header_fill']
+                cell.alignment = estilos['header_alignment']
+                cell.border = estilos['border']
+            
+            # Datos
+            for row, prod in enumerate(productos, 2):
+                ws.cell(row=row, column=1, value=prod.get('codigo', ''))
+                ws.cell(row=row, column=2, value=prod.get('nombre', ''))
+                ws.cell(row=row, column=3, value=prod.get('categoria_nombre', ''))
+                ws.cell(row=row, column=4, value=prod.get('marca', ''))
+                ws.cell(row=row, column=5, value=prod.get('unidad_medida', 'Unidad'))
+                ws.cell(row=row, column=6, value=prod.get('precio_usd', 0))
+                ws.cell(row=row, column=7, value=prod.get('costo_usd', 0))
+                ws.cell(row=row, column=8, value=prod.get('porcentaje_ganancia', 30))
+                ws.cell(row=row, column=9, value=prod.get('stock_actual', 0))
+                ws.cell(row=row, column=10, value=prod.get('stock_minimo', 5))
+                ws.cell(row=row, column=11, value="Activo" if prod.get('activo', 1) else "Inactivo")
+            
+            # Ajustar anchos
+            anchos = [12, 30, 15, 15, 10, 12, 12, 12, 12, 12, 10]
+            for col, ancho in enumerate(anchos, 1):
+                ws.column_dimensions[get_column_letter(col)].width = ancho
+            
+            wb.save(ruta)
+            CTkMessagebox(
+                title="Exportación Exitosa",
+                message=f"Se exportaron {len(productos)} productos.\n\nArchivo: {Path(ruta).name}",
+                icon="check"
+            )
+        except Exception as e:
+            CTkMessagebox(title="Error", message=f"Error al exportar:\n{str(e)}", icon="cancel")

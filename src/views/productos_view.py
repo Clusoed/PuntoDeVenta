@@ -17,6 +17,8 @@ from utils.theme import (
     BG_PRINCIPAL, BG_SECUNDARIO, BG_HOVER, BORDER_COLOR,
     TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_PRIMARY
 )
+from utils.excel_import import ImportDialog, generar_plantilla_excel
+from tkinter import filedialog
 
 
 class ProductosView(ctk.CTkFrame):
@@ -53,14 +55,41 @@ class ProductosView(ctk.CTkFrame):
             font=ctk.CTkFont(size=24, weight="bold")
         ).grid(row=0, column=0, sticky="w")
         
+        # Botones de acción
+        frame_acciones = ctk.CTkFrame(frame_header, fg_color="transparent")
+        frame_acciones.grid(row=0, column=2, padx=10)
+        
         # Botón nuevo producto
         ctk.CTkButton(
-            frame_header,
+            frame_acciones,
             text="➕ Nuevo Producto",
             fg_color=ACCENT_PRIMARY,
             hover_color="#0284c7",
             command=self.abrir_formulario_nuevo
-        ).grid(row=0, column=2, padx=10)
+        ).pack(side="left", padx=5)
+        
+        # Separador visual
+        ctk.CTkLabel(frame_acciones, text="|", text_color="gray50").pack(side="left", padx=10)
+        
+        # Botón descargar plantilla
+        ctk.CTkButton(
+            frame_acciones,
+            text="📄 Plantilla",
+            fg_color="gray50",
+            hover_color="gray40",
+            text_color="#ffffff",
+            command=self.descargar_plantilla
+        ).pack(side="left", padx=5)
+        
+        # Botón importar Excel
+        ctk.CTkButton(
+            frame_acciones,
+            text="📥 Importar Excel",
+            fg_color="#9b59b6",
+            hover_color="#8e44ad",
+            text_color="#ffffff",
+            command=self.abrir_importar
+        ).pack(side="left", padx=5)
         
         # Búsqueda
         frame_busqueda = ctk.CTkFrame(frame_header, fg_color="transparent")
@@ -297,6 +326,34 @@ class ProductosView(ctk.CTkFrame):
                 CTkMessagebox(title="Éxito", message="Producto eliminado", icon="check")
             else:
                 CTkMessagebox(title="Error", message="Error al eliminar producto", icon="cancel")
+    
+    def descargar_plantilla(self):
+        """Descarga la plantilla Excel para importar productos."""
+        try:
+            ruta = filedialog.asksaveasfilename(
+                title="Guardar plantilla",
+                defaultextension=".xlsx",
+                initialfile="Plantilla_Productos.xlsx",
+                filetypes=[("Archivo Excel", "*.xlsx")]
+            )
+            
+            if ruta:
+                generar_plantilla_excel(ruta)
+                CTkMessagebox(
+                    title="Plantilla Generada",
+                    message=f"La plantilla se guardó correctamente.\n\nRuta: {ruta}",
+                    icon="check"
+                )
+        except Exception as e:
+            CTkMessagebox(
+                title="Error",
+                message=f"Error al generar plantilla:\n{str(e)}",
+                icon="cancel"
+            )
+    
+    def abrir_importar(self):
+        """Abre el diálogo de importación de productos desde Excel."""
+        ImportDialog(self, callback=self.cargar_datos)
 
 
 class FormularioProducto(ctk.CTkToplevel):

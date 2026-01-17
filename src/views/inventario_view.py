@@ -14,8 +14,6 @@ from database import (
 )
 from utils.currency import formato_usd, formato_bs
 from utils.theme import BG_PRINCIPAL, BG_SECUNDARIO, BORDER_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, ACCENT_PRIMARY, WARNING, BG_HOVER, ERROR, ACCENT_HOVER
-from utils.excel_import import ImportDialog, generar_plantilla_excel
-from tkinter import filedialog
 
 
 class InventarioView(ctk.CTkFrame):
@@ -72,29 +70,6 @@ class InventarioView(ctk.CTkFrame):
             hover_color="#4a5a7b",
             text_color="#ffffff",
             command=self.ver_movimientos
-        ).pack(side="left", padx=5)
-        
-        # Separador visual
-        ctk.CTkLabel(frame_acciones, text="|", text_color="gray50").pack(side="left", padx=10)
-        
-        # Botón descargar plantilla
-        ctk.CTkButton(
-            frame_acciones,
-            text="📄 Plantilla",
-            fg_color="gray50",
-            hover_color="gray40",
-            text_color="#ffffff",
-            command=self.descargar_plantilla
-        ).pack(side="left", padx=5)
-        
-        # Botón importar Excel
-        ctk.CTkButton(
-            frame_acciones,
-            text="📥 Importar Excel",
-            fg_color="#9b59b6",
-            hover_color="#8e44ad",
-            text_color="#ffffff",
-            command=self.abrir_importar
         ).pack(side="left", padx=5)
         
         # === FILTROS ===
@@ -286,34 +261,6 @@ class InventarioView(ctk.CTkFrame):
     def ver_movimientos(self):
         """Abre el diálogo de movimientos."""
         DialogoMovimientos(self)
-    
-    def descargar_plantilla(self):
-        """Descarga la plantilla Excel para importar inventario."""
-        try:
-            ruta = filedialog.asksaveasfilename(
-                title="Guardar plantilla",
-                defaultextension=".xlsx",
-                initialfile="Plantilla_Inventario.xlsx",
-                filetypes=[("Archivo Excel", "*.xlsx")]
-            )
-            
-            if ruta:
-                generar_plantilla_excel(ruta)
-                CTkMessagebox(
-                    title="Plantilla Generada",
-                    message=f"La plantilla se guardó correctamente.\n\nRuta: {ruta}",
-                    icon="check"
-                )
-        except Exception as e:
-            CTkMessagebox(
-                title="Error",
-                message=f"Error al generar plantilla:\n{str(e)}",
-                icon="cancel"
-            )
-    
-    def abrir_importar(self):
-        """Abre el diálogo de importación de inventario."""
-        ImportDialog(self, callback=self.cargar_datos)
 
 
 class FormularioAjuste(ctk.CTkToplevel):

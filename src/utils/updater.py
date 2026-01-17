@@ -138,31 +138,76 @@ def download_update(download_url: str, progress_callback=None) -> Optional[Path]
         print(f"Error descargando actualización: {e}")
         return None
 
-
 def apply_update(update_file: Path):
     """
     Aplica la actualización: cierra la app actual y ejecuta el nuevo .exe.
-    El nuevo .exe debería reemplazar al antiguo.
+    Usa un enfoque robusto que espera a que el proceso termine completamente.
     """
     if not update_file.exists():
         return
     
-    # Crear un script batch que espera, reemplaza y ejecuta
+    # Crear un script batch mejorado
     current_exe = sys.executable if getattr(sys, 'frozen', False) else None
     
     if current_exe:
+        current_exe_path = Path(current_exe)
+        backup_exe = current_exe_path.with_suffix('.exe.old')
+        
+        # Script batch mejorado:
+        # 1. Espera más tiempo para que el proceso termine
+        # 2. Usa taskkill para asegurar que el proceso terminó
+        # 3. Renombra el viejo .exe como backup
+        # 4. Copia el nuevo
+        # 5. Elimina el backup
+        # 6. Ejecuta el nuevo
         batch_content = f'''@echo off
+echo Aplicando actualizacion...
+echo Por favor espere...
+
+REM Esperar a que el proceso termine completamente
+timeout /t 3 /nobreak > nul
+
+REM Intentar matar el proceso si aún existe
+taskkill /F /IM "{current_exe_path.name}" 2>nul
+
+REM Esperar un poco más
 timeout /t 2 /nobreak > nul
+
+REM Eliminar backup anterior si existe
+if exist "{backup_exe}" del /f /q "{backup_exe}"
+
+REM Renombrar el exe actual como backup
+if exist "{current_exe}" ren "{current_exe}" "{current_exe_path.name}.old"
+
+REM Copiar el nuevo exe
 copy /y "{update_file}" "{current_exe}"
-start "" "{current_exe}"
+
+REM Si la copia fue exitosa, eliminar backup
+if exist "{current_exe}" (
+    if exist "{backup_exe}" del /f /q "{backup_exe}"
+    echo Actualizacion completada!
+    timeout /t 1 /nobreak > nul
+    start "" "{current_exe}"
+) else (
+    echo Error en la actualizacion. Restaurando...
+    if exist "{backup_exe}" ren "{backup_exe}" "{current_exe_path.name}"
+)
+
+REM Eliminar este script
 del "%~f0"
 '''
         batch_file = Path(tempfile.gettempdir()) / "pdv_update.bat"
-        with open(batch_file, 'w') as f:
+        with open(batch_file, 'w', encoding='utf-8') as f:
             f.write(batch_content)
         
-        # Ejecutar el batch y cerrar la app
-        subprocess.Popen(f'cmd /c "{batch_file}"', shell=True)
+        # Ejecutar el batch en una nueva ventana de consola
+        subprocess.Popen(
+            f'cmd /c "{batch_file}"',
+            shell=True,
+            creationflags=subprocess.CREATE_NEW_CONSOLE
+        )
+        
+        # Cerrar la aplicación
         sys.exit(0)
     else:
         # En modo desarrollo, solo mostrar mensaje

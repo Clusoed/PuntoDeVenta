@@ -3,6 +3,7 @@ Gestor de Licencias Offline
 Sistema de activación y validación de licencias permanentes vinculadas al hardware.
 """
 import os
+import sys
 import json
 import hashlib
 import base64
@@ -20,19 +21,22 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 SECRET_KEY = b"PuntoDeVenta_SecretKey_2024_Permanent"
 
 
-def get_base_path() -> Path:
-    """Obtiene el directorio base de la aplicación."""
+def get_license_dir() -> Path:
+    """Obtiene el directorio para archivos de licencia (mismo que la BD)."""
     if getattr(sys, 'frozen', False):
-        # Ejecutándose como .exe
-        return Path(sys.executable).parent
+        # Ejecutando como .exe - usar AppData/Local para persistencia
+        app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+        return Path(app_data) / 'PuntoDeVenta' / 'data'
     else:
-        # Ejecutándose como script
-        return Path(__file__).parent.parent.parent
+        # Ejecutando desde código fuente
+        return Path(__file__).parent.parent.parent / 'data'
 
 
 def get_license_path() -> Path:
     """Obtiene la ruta del archivo de licencia."""
-    return get_base_path() / "license.dat"
+    license_dir = get_license_dir()
+    license_dir.mkdir(parents=True, exist_ok=True)
+    return license_dir / "license.dat"
 
 
 def _get_fernet_key() -> bytes:
